@@ -1,0 +1,16 @@
+services:
+  app:
+    build: .
+    ports:
+      - "${PORT:-3001}:3001"
+    environment:
+      - PORT=3001
+      - JWT_SECRET=${JWT_SECRET:-change-me-in-production}
+      - CORS_ORIGIN=${CORS_ORIGIN:-http://localhost:3001}
+      - DB_PATH=/app/packages/server/data/trains.db
+    volumes:
+      - app-data:/app/packages/server/data
+    restart: unless-stopped
+
+volumes:
+  app-data:
