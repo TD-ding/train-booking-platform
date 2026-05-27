@@ -49,10 +49,21 @@ const SEARCH_SQL = `
 `;
 
 router.get("/search", (req: Request, res: Response) => {
-  const { from_station_id, to_station_id } = req.query;
+  const { from_station_id, to_station_id, date } = req.query;
   if (!from_station_id || !to_station_id) {
     res.status(400).json({ error: "请选择出发站和到达站" });
     return;
+  }
+  if (from_station_id === to_station_id) {
+    res.status(400).json({ error: "出发站和到达站不能相同" });
+    return;
+  }
+  if (date) {
+    const today = new Date().toISOString().split("T")[0];
+    if (String(date) < today) {
+      res.status(400).json({ error: "不能查询过去的日期" });
+      return;
+    }
   }
   const db = getDb();
 
