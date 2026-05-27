@@ -33,7 +33,30 @@ router.get("/dashboard", (_req: Request, res: Response) => {
     ORDER BY b.created_at DESC LIMIT 10
   `).all();
 
-  res.json({ totalOrders, totalRevenue, totalUsers, pendingOrders, todayOrders, popularRoutes, recentOrders });
+  const salesTrend = db.prepare(`
+    WITH RECURSIVE days(date) AS (
+      SELECT date('now', '-6 days')
+      UNION ALL
+      SELECT date(date, '+1 day') FROM days WHERE date < date('now')
+    )
+    SELECT days.date, COALESCE(COUNT(b.id), 0) as count, COALESCE(SUM(b.price), 0) as revenue
+    FROM days
+    LEFT JOIN bookings b ON date(b.created_at) = days.date AND b.status IN ('paid', 'completed')
+    GROUP BY days.date
+    ORDER BY days.date
+  `).all();
+
+  const routeDistribution = db.prepare(`
+    SELECT fs.name as from_station, ts.name as to_station, COUNT(*) as count
+    FROM bookings b
+    JOIN stations fs ON b.from_station_id = fs.id
+    JOIN stations ts ON b.to_station_id = ts.id
+    WHERE b.status IN ('paid', 'completed')
+    GROUP BY b.from_station_id, b.to_station_id
+    ORDER BY count DESC LIMIT 10
+  `).all();
+
+  res.json({ totalOrders, totalRevenue, totalUsers, pendingOrders, todayOrders, popularRoutes, recentOrders, salesTrend, routeDistribution });
 });
 
 router.get("/users", (_req: Request, res: Response) => {
@@ -114,10 +137,34 @@ router.post("/trains/:id/stops", (req: Request, res: Response) => {
     return;
   }
   const db = getDb();
+  db.prepare("UPDATE train_stops SET stop_order = stop_order + 1 WHERE train_id = ? AND stop_order >= ?")
+    .run(req.params.id, stop_order);
   db.prepare(
     "INSERT INTO train_stops (train_id, station_id, stop_order, arrival_time, departure_time, stop_duration) VALUES (?, ?, ?, ?, ?, ?)"
   ).run(req.params.id, station_id, stop_order, arrival_time || "", departure_time || "", stop_duration || 2);
   res.status(201).json({ message: "添加成功" });
+});
+
+router.put("/trains/:trainId/stops/:stopId", (req: Request, res: Response) => {
+  const { station_id, stop_order, arrival_time, departure_time, stop_duration } = req.body;
+  const db = getDb();
+  const existing = db.prepare("SELECT * FROM train_stops WHERE id = ? AND train_id = ?")
+    .get(req.params.stopId, req.params.trainId) as Record<string, unknown> | undefined;
+  if (!existing) {
+    res.status(404).json({ error: "经停站不存在" });
+    return;
+  }
+  db.prepare(
+    "UPDATE train_stops SET station_id=?, stop_order=?, arrival_time=?, departure_time=?, stop_duration=? WHERE id=?"
+  ).run(
+    station_id ?? existing.station_id,
+    stop_order ?? existing.stop_order,
+    arrival_time ?? existing.arrival_time,
+    departure_time ?? existing.departure_time,
+    stop_duration ?? existing.stop_duration,
+    req.params.stopId
+  );
+  res.json({ message: "更新成功" });
 });
 
 router.delete("/trains/:trainId/stops/:stopId", (req: Request, res: Response) => {

@@ -117,4 +117,6 @@ export interface DashboardData {
   todayOrders: number;
   popularRoutes: { from_station: string; to_station: string; count: number }[];
   recentOrders: Booking[];
+  salesTrend: { date: string; count: number; revenue: number }[];
+  routeDistribution: { from_station: string; to_station: string; count: number }[];
 }

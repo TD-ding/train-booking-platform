@@ -73,4 +73,25 @@ router.get("/me", authMiddleware, (req: Request, res: Response) => {
   res.json(user);
 });
 
+router.put("/change-password", authMiddleware, (req: Request, res: Response) => {
+  const { old_password, new_password } = req.body;
+  if (!old_password || !new_password) {
+    res.status(400).json({ error: "旧密码和新密码不能为空" });
+    return;
+  }
+  if (new_password.length < 6) {
+    res.status(400).json({ error: "新密码长度不能少于6位" });
+    return;
+  }
+  const db = getDb();
+  const user = db.prepare("SELECT password FROM users WHERE id = ?").get(req.user!.userId) as { password: string } | undefined;
+  if (!user || !bcrypt.compareSync(old_password, user.password)) {
+    res.status(400).json({ error: "旧密码不正确" });
+    return;
+  }
+  db.prepare("UPDATE users SET password = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+    .run(bcrypt.hashSync(new_password, 10), req.user!.userId);
+  res.json({ message: "密码修改成功" });
+});
+
 export default router;
