@@ -1,24 +1,101 @@
 # 火车票订购平台 (Train Ticket Booking Platform)
 
-一个全栈火车票订购系统，包含用户购票界面和管理员管理界面。
+一个全栈火车票订购系统，模拟中国铁路 12306 购票平台，包含用户购票界面和管理员管理界面。
 
 ## 功能特性
 
-- 用户注册/登录
-- 车次查询（按出发站/到达站/日期）
-- 在线订票（支持多种座位类型）
-- 订单管理（查看/取消/支付）
-- 管理员仪表盘（统计/车次管理/订单管理）
+### 用户端
+- 首页搜索车次（出发站/到达站/日期）
+- 搜索结果展示（车次/时间/价格/座位类型/余票）
+- 车次详情（经停站信息、各座位类型余票和票价）
+- 购票流程（选择乘客 → 确认订单 → 模拟支付）
+- 用户注册/登录（JWT 认证）
+- 我的订单（待支付/已支付/已取消/已完成/已退票）
+- 个人中心（常用联系人 CRUD）
+
+### 管理员端 (/admin)
+- 仪表盘（总订单/收入/用户数/热门路线/最近订单）
+- 车次管理（增删改查）
+- 车站管理（增删改查）
+- 订单管理（按状态筛选、退票处理）
+- 用户管理（角色切换）
 
 ## 技术栈
 
-- **前端**: React + TypeScript + Vite + TailwindCSS + shadcn/ui
+- **前端**: React 18 + TypeScript + Vite + TailwindCSS + shadcn/ui
 - **后端**: Node.js + Express + TypeScript
 - **数据库**: SQLite (better-sqlite3)
-- **认证**: JWT
+- **认证**: JWT (jsonwebtoken + bcryptjs)
+- **工程化**: npm workspaces (monorepo) + ESLint v9 flat config
 
-## 开发迭代记录
+## 项目结构
 
-| 轮次 | 类型 | 描述 | PR |
-|------|------|------|----|
-| 1 | feat | 初始版本 | - |
+```
+train-booking-platform/
+├── packages/
+│   ├── client/          # React 前端
+│   │   └── src/
+│   │       ├── components/   # UI 组件 + 布局组件
+│   │       ├── pages/        # 页面（含 admin/ 子目录）
+│   │       ├── services/     # API 服务
+│   │       ├── store/        # Zustand 状态管理
+│   │       ├── lib/          # 工具函数
+│   │       └── types/        # TypeScript 类型定义
+│   └── server/          # Express 后端
+│       └── src/
+│           ├── config/       # 配置
+│           ├── db/           # 数据库（迁移 + 种子数据）
+│           ├── middleware/    # 认证中间件
+│           ├── routes/       # API 路由
+│           └── types/        # TypeScript 类型定义
+├── eslint.config.js     # ESLint v9 flat config
+└── package.json         # 根 monorepo 配置
+```
+
+## 快速开始
+
+```bash
+# 安装依赖
+npm install
+
+# 启动开发环境（前后端同时启动）
+npm run dev
+
+# 仅启动后端
+npm run dev:server
+
+# 仅启动前端
+npm run dev:client
+
+# 构建生产版本
+npm run build
+
+# 代码检查
+npm run lint
+```
+
+前端运行在 http://localhost:5173，后端运行在 http://localhost:3001。
+
+## 测试账号
+
+| 用户名 | 密码 | 角色 |
+|--------|------|------|
+| admin | admin123 | 管理员 |
+| zhangsan | 123456 | 普通用户 |
+| lisi | 123456 | 普通用户 |
+
+## 数据库表
+
+- `users` - 用户
+- `stations` - 车站（预置 20 个主要城市站点）
+- `trains` - 车次（预置 10 条 G/D 车次）
+- `train_stops` - 经停站时刻表
+- `seat_types` - 座位类型（硬座/软座/硬卧/软卧/商务座）
+- `train_seats` - 车次座位库存和票价
+- `contacts` - 常用联系人
+- `bookings` - 订单
+- `payments` - 支付记录
+
+## 座位类型
+
+硬座、软座、硬卧、软卧、商务座
