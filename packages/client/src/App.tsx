@@ -17,13 +17,15 @@ import UserManagement from "@/pages/admin/UserManagement";
 import { useAuthStore } from "@/store/authStore";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { token } = useAuthStore();
+  const { token, initialized } = useAuthStore();
+  if (!initialized) return <div className="min-h-screen" />;
   if (!token) return <Navigate to="/login" />;
   return <>{children}</>;
 }
 
 function AdminRoute({ children }: { children: React.ReactNode }) {
-  const { user, token } = useAuthStore();
+  const { user, token, initialized } = useAuthStore();
+  if (!initialized) return <div className="min-h-screen" />;
   if (!token) return <Navigate to="/login" />;
   if (user?.role !== "admin") return <Navigate to="/" />;
   return <>{children}</>;
