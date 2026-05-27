@@ -21,5 +21,6 @@ export function getDb(): Database.Database {
 export function closeDb(): void {
   if (db) {
     db.close();
+    db = undefined as unknown as Database.Database;
   }
 }
