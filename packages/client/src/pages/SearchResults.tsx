@@ -1,9 +1,9 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useSearchParams, useNavigate, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Train, Clock, ArrowRight, ArrowLeftRight } from "lucide-react";
+import { Train, Clock, ArrowRight, ArrowLeftRight, ArrowUpDown } from "lucide-react";
 import api from "@/services/api";
 import type { TrainSearchResult, Station } from "@/types";
 import { formatPrice } from "@/lib/utils";
@@ -23,6 +23,20 @@ function seatAvailabilityText(available: number): { text: string; cls: string } 
   return { text: `余${available}张`, cls: "text-green-600" };
 }
 
+type SortKey = "time" | "price" | "duration";
+
+const SORT_OPTIONS: { key: SortKey; label: string }[] = [
+  { key: "time", label: "出发时间" },
+  { key: "price", label: "最低价" },
+  { key: "duration", label: "历时" },
+];
+
+function parseDuration(d: string): number {
+  const h = d.match(/(\d+)小时/);
+  const m = d.match(/(\d+)分/);
+  return (h ? parseInt(h[1]) * 60 : 0) + (m ? parseInt(m[1]) : 0);
+}
+
 export default function SearchResults() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -33,6 +47,7 @@ export default function SearchResults() {
   const [results, setResults] = useState<TrainSearchResult[]>([]);
   const [loading, setLoading] = useState(true);
   const [stations, setStations] = useState<Station[]>([]);
+  const [sortKey, setSortKey] = useState<SortKey>("time");
 
   useEffect(() => {
     api.get("/stations").then((res) => setStations(res.data));
@@ -52,6 +67,22 @@ export default function SearchResults() {
     searchTrains();
   }, [searchTrains]);
 
+  const sortedResults = useMemo(() => {
+    const copy = [...results];
+    if (sortKey === "time") {
+      copy.sort((a, b) => (a.from_stop?.from_dep_time || "").localeCompare(b.from_stop?.from_dep_time || ""));
+    } else if (sortKey === "price") {
+      copy.sort((a, b) => {
+        const aMin = a.seats.length > 0 ? Math.min(...a.seats.map((s) => s.price)) : Infinity;
+        const bMin = b.seats.length > 0 ? Math.min(...b.seats.map((s) => s.price)) : Infinity;
+        return aMin - bMin;
+      });
+    } else if (sortKey === "duration") {
+      copy.sort((a, b) => parseDuration(a.train.duration) - parseDuration(b.train.duration));
+    }
+    return copy;
+  }, [results, sortKey]);
+
   const fromStation = stations.find((s) => s.id === Number(fromId));
   const toStation = stations.find((s) => s.id === Number(toId));
 
@@ -62,7 +93,27 @@ export default function SearchResults() {
           {fromStation?.name || "出发站"} → {toStation?.name || "到达站"}
           <span className="text-gray-500 text-sm font-normal ml-2">{date}</span>
         </h1>
-        <p className="text-sm text-gray-500 mt-1">共找到 {results.length} 个车次</p>
+        <div className="flex items-center justify-between mt-2">
+          <p className="text-sm text-gray-500">共找到 {results.length} 个车次</p>
+          {results.length > 0 && (
+            <div className="flex items-center gap-1.5">
+              <ArrowUpDown className="w-3.5 h-3.5 text-gray-400" />
+              {SORT_OPTIONS.map((opt) => (
+                <button
+                  key={opt.key}
+                  onClick={() => setSortKey(opt.key)}
+                  className={`px-2.5 py-1 rounded-full text-xs transition-colors ${
+                    sortKey === opt.key
+                      ? "bg-railway-primary text-white"
+                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {loading ? (
@@ -74,10 +125,9 @@ export default function SearchResults() {
         </Card>
       ) : (
         <div className="space-y-3">
-          {results.map((r, idx) => (
+          {sortedResults.map((r, idx) => (
             <Card key={idx} className="hover:shadow-lg transition-shadow overflow-hidden">
               <CardContent className="p-0">
-                {/* Train info header */}
                 <div className="flex items-center justify-between px-4 py-3 border-b bg-gray-50/50">
                   <div className="flex items-center gap-2">
                     <Badge className="bg-railway-primary text-white text-sm px-2.5 py-0.5">
@@ -93,7 +143,6 @@ export default function SearchResults() {
                 </div>
 
                 <div className="flex flex-col md:flex-row">
-                  {/* Time & station */}
                   <div className="flex items-center justify-around md:justify-center md:gap-8 px-4 py-4 md:px-8 md:py-6 md:min-w-[280px]">
                     <div className="text-center">
                       <div className="text-xs text-gray-500 mb-0.5">{r.from_station?.name}</div>
@@ -118,7 +167,6 @@ export default function SearchResults() {
                     </div>
                   </div>
 
-                  {/* Seat types */}
                   <div className="flex-1 border-t md:border-t-0 md:border-l px-3 py-3 md:px-4 md:py-4">
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-2 lg:grid-cols-3 gap-2">
                       {r.seats.map((seat) => {
