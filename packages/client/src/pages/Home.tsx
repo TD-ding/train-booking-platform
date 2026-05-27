@@ -110,6 +110,10 @@ export default function Home() {
       alert("请选择出发站和到达站");
       return;
     }
+    if (selectedFrom.id === selectedTo.id) {
+      alert("出发站和到达站不能相同");
+      return;
+    }
     navigate(`/search?from=${selectedFrom.id}&to=${selectedTo.id}&date=${date}`);
   };
 

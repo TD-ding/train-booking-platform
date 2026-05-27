@@ -84,8 +84,8 @@ export default function TrainManagement() {
       await api.delete(`/admin/trains/${id}`);
       loadTrains();
       toast.success("车次已删除");
-    } catch {
-      toast.error("删除失败");
+    } catch (err: unknown) {
+      toast.error((err as { response?: { data?: { error?: string } } })?.response?.data?.error || "删除失败");
     }
   };
 

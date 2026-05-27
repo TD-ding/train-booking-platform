@@ -21,6 +21,7 @@ export default function Profile() {
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [pwForm, setPwForm] = useState({ old_password: "", new_password: "", confirm_password: "" });
   const [importText, setImportText] = useState("");
+  const [importResult, setImportResult] = useState<{ imported: number; errors: { row: number; error: string }[]; total: number } | null>(null);
 
   const loadContacts = useCallback(async () => {
     try {
@@ -120,13 +121,10 @@ export default function Profile() {
     }
     try {
       const res = await api.post("/contacts/batch", { contacts: parsed });
-      setImportDialogOpen(false);
-      setImportText("");
-      loadContacts();
       const d = res.data as { imported: number; errors: { row: number; error: string }[]; total: number };
-      if (d.errors.length > 0) {
-        toast.info(`成功导入 ${d.imported}/${d.total} 个联系人，${d.errors.length} 条有误`);
-      } else {
+      loadContacts();
+      setImportResult(d);
+      if (d.errors.length === 0) {
         toast.success(`成功导入 ${d.imported} 个联系人`);
       }
     } catch (err: unknown) {
@@ -249,29 +247,76 @@ export default function Profile() {
       </Dialog>
 
       {/* Batch import dialog */}
-      <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
+      <Dialog open={importDialogOpen} onOpenChange={(open) => {
+        setImportDialogOpen(open);
+        if (!open) { setImportResult(null); setImportText(""); }
+      }}>
         <DialogContent>
           <DialogHeader><DialogTitle>批量导入联系人</DialogTitle></DialogHeader>
-          <div className="space-y-3">
-            <p className="text-xs text-gray-500">
-              每行一个联系人，格式：姓名,身份证号,手机号（用逗号或制表符分隔，手机号可选）
-            </p>
-            <textarea
-              className="w-full h-48 px-3 py-2 border rounded-md text-sm font-mono resize-none focus:ring-2 focus:ring-railway-primary focus:border-transparent outline-none"
-              placeholder={"张三,110101199001011237,13800138000\n李四,110101199002022345,13900139000"}
-              value={importText}
-              onChange={(e) => setImportText(e.target.value)}
-            />
-            <p className="text-xs text-gray-400">
-              已解析 {parseImportText().length} 条有效记录（最多50条）
-            </p>
-          </div>
-          <DialogFooter>
-            <DialogClose asChild><Button variant="outline">取消</Button></DialogClose>
-            <Button onClick={handleImport} className="bg-railway-primary" disabled={parseImportText().length === 0}>
-              导入 ({parseImportText().length})
-            </Button>
-          </DialogFooter>
+
+          {importResult ? (
+            <div className="space-y-3">
+              <div className={`rounded-lg p-4 ${importResult.errors.length === 0 ? "bg-green-50" : "bg-yellow-50"}`}>
+                <div className="flex items-center gap-3 mb-2">
+                  <span className="text-2xl">{importResult.errors.length === 0 ? "✅" : "⚠️"}</span>
+                  <div>
+                    <div className="font-medium">
+                      成功导入 {importResult.imported} / {importResult.total} 条
+                    </div>
+                    {importResult.errors.length > 0 && (
+                      <div className="text-sm text-gray-500">{importResult.errors.length} 条失败</div>
+                    )}
+                  </div>
+                </div>
+              </div>
+              {importResult.errors.length > 0 && (
+                <div className="max-h-40 overflow-y-auto border rounded-lg">
+                  <table className="w-full text-xs">
+                    <thead className="bg-gray-50 sticky top-0">
+                      <tr>
+                        <th className="px-3 py-1.5 text-left text-gray-500">行号</th>
+                        <th className="px-3 py-1.5 text-left text-gray-500">错误原因</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {importResult.errors.map((e, i) => (
+                        <tr key={i} className="border-t">
+                          <td className="px-3 py-1.5">第 {e.row} 行</td>
+                          <td className="px-3 py-1.5 text-red-600">{e.error}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              <Button onClick={() => { setImportResult(null); setImportText(""); }} className="w-full bg-railway-primary">
+                继续导入
+              </Button>
+            </div>
+          ) : (
+            <>
+              <div className="space-y-3">
+                <p className="text-xs text-gray-500">
+                  每行一个联系人，格式：姓名,身份证号,手机号（用逗号或制表符分隔，手机号可选）
+                </p>
+                <textarea
+                  className="w-full h-48 px-3 py-2 border rounded-md text-sm font-mono resize-none focus:ring-2 focus:ring-railway-primary focus:border-transparent outline-none"
+                  placeholder={"张三,110101199001011237,13800138000\n李四,110101199002022345,13900139000"}
+                  value={importText}
+                  onChange={(e) => setImportText(e.target.value)}
+                />
+                <p className="text-xs text-gray-400">
+                  已解析 {parseImportText().length} 条有效记录（最多50条）
+                </p>
+              </div>
+              <DialogFooter>
+                <DialogClose asChild><Button variant="outline">取消</Button></DialogClose>
+                <Button onClick={handleImport} className="bg-railway-primary" disabled={parseImportText().length === 0}>
+                  导入 ({parseImportText().length})
+                </Button>
+              </DialogFooter>
+            </>
+          )}
         </DialogContent>
       </Dialog>
     </div>

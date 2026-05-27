@@ -124,6 +124,13 @@ router.put("/trains/:id", (req: Request, res: Response) => {
 
 router.delete("/trains/:id", (req: Request, res: Response) => {
   const db = getDb();
+  const activeOrders = (db.prepare(
+    "SELECT COUNT(*) as count FROM bookings WHERE train_id = ? AND status IN ('pending', 'paid')"
+  ).get(req.params.id) as { count: number }).count;
+  if (activeOrders > 0) {
+    res.status(400).json({ error: `该车次有 ${activeOrders} 个未完成订单，请先处理后再删除` });
+    return;
+  }
   db.prepare("DELETE FROM train_stops WHERE train_id = ?").run(req.params.id);
   db.prepare("DELETE FROM train_seats WHERE train_id = ?").run(req.params.id);
   db.prepare("DELETE FROM trains WHERE id = ?").run(req.params.id);
