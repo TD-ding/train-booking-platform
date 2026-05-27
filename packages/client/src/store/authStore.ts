@@ -5,7 +5,7 @@ import api from "@/services/api";
 interface AuthState {
   user: User | null;
   token: string | null;
-  loading: boolean;
+  initialized: boolean;
   login: (username: string, password: string) => Promise<void>;
   register: (data: { username: string; password: string; real_name: string; phone: string; email: string }) => Promise<void>;
   logout: () => void;
@@ -13,16 +13,16 @@ interface AuthState {
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
-  user: JSON.parse(localStorage.getItem("user") || "null"),
-  token: localStorage.getItem("token"),
-  loading: false,
+  user: null,
+  token: null,
+  initialized: false,
 
   login: async (username, password) => {
     const res = await api.post("/auth/login", { username, password });
     const { token, user } = res.data;
     localStorage.setItem("token", token);
     localStorage.setItem("user", JSON.stringify(user));
-    set({ token, user, loading: false });
+    set({ token, user, initialized: true });
   },
 
   register: async (data) => {
@@ -30,7 +30,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     const { token, user } = res.data;
     localStorage.setItem("token", token);
     localStorage.setItem("user", JSON.stringify(user));
-    set({ token, user, loading: false });
+    set({ token, user, initialized: true });
   },
 
   logout: () => {
@@ -42,18 +42,18 @@ export const useAuthStore = create<AuthState>((set) => ({
   checkAuth: async () => {
     const token = localStorage.getItem("token");
     if (!token) {
-      set({ user: null, token: null });
+      set({ user: null, token: null, initialized: true });
       return;
     }
     try {
       const res = await api.get("/auth/me");
       const user = res.data;
       localStorage.setItem("user", JSON.stringify(user));
-      set({ user, token, loading: false });
+      set({ user, token, initialized: true });
     } catch {
       localStorage.removeItem("token");
       localStorage.removeItem("user");
-      set({ user: null, token: null, loading: false });
+      set({ user: null, token: null, initialized: true });
     }
   },
 }));
