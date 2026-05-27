@@ -14,6 +14,20 @@ export function formatPrice(price: number): string {
   return `¥${price.toFixed(2)}`;
 }
 
+export function validateIdCard(idCard: string): string | null {
+  if (!/^\d{17}[\dXx]$/.test(idCard)) {
+    return "身份证号格式不正确，应为18位数字";
+  }
+  return null;
+}
+
+export function validatePhone(phone: string): string | null {
+  if (phone && !/^1[3-9]\d{9}$/.test(phone)) {
+    return "手机号格式不正确，应为11位数字且以1开头";
+  }
+  return null;
+}
+
 export const statusLabels: Record<string, string> = {
   pending: "待支付",
   paid: "已支付",

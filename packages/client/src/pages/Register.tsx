@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuthStore } from "@/store/authStore";
+import { validatePhone } from "@/lib/utils";
 
 export default function Register() {
   const navigate = useNavigate();
@@ -22,6 +23,11 @@ export default function Register() {
     }
     if (form.password.length < 6) {
       setError("密码长度不能少于6位");
+      return;
+    }
+    const phoneErr = validatePhone(form.phone);
+    if (phoneErr) {
+      setError(phoneErr);
       return;
     }
     setLoading(true);

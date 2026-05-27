@@ -2,6 +2,7 @@ import { Router, Request, Response } from "express";
 import bcrypt from "bcryptjs";
 import { getDb } from "../db/index.js";
 import { generateToken, authMiddleware } from "../middleware/auth.js";
+import { validatePhone } from "../lib/validate.js";
 
 const router = Router();
 
@@ -9,6 +10,19 @@ router.post("/register", (req: Request, res: Response) => {
   const { username, password, real_name, phone, email } = req.body;
   if (!username || !password) {
     res.status(400).json({ error: "用户名和密码不能为空" });
+    return;
+  }
+  if (username.length < 2 || username.length > 20) {
+    res.status(400).json({ error: "用户名长度应在2-20个字符之间" });
+    return;
+  }
+  if (password.length < 6) {
+    res.status(400).json({ error: "密码长度不能少于6位" });
+    return;
+  }
+  const phoneError = validatePhone(phone);
+  if (phoneError) {
+    res.status(400).json({ error: phoneError });
     return;
   }
   const db = getDb();
