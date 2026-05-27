@@ -3,4 +3,5 @@ dist/
 *.db
 *.sqlite
 .env
+.secret
 .DS_Store

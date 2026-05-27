@@ -3,6 +3,51 @@ import { getDb } from "../db/index.js";
 
 const router = Router();
 
+interface SearchRow {
+  train_id: number;
+  train_number: string;
+  train_type: string;
+  departure_station_id: number;
+  arrival_station_id: number;
+  departure_time: string;
+  arrival_time: string;
+  duration: string;
+  status: string;
+  created_at: string;
+  from_order: number;
+  from_dep_time: string;
+  to_order: number;
+  to_arr_time: string;
+  seat_id: number;
+  seat_type_id: number;
+  from_stop_order: number;
+  to_stop_order: number;
+  total_seats: number;
+  available_seats: number;
+  price: number;
+  seat_type_name: string;
+  seat_type_code: string;
+}
+
+const SEARCH_SQL = `
+  SELECT
+    t.id as train_id, t.train_number, t.train_type, t.departure_station_id, t.arrival_station_id,
+    t.departure_time, t.arrival_time, t.duration, t.status, t.created_at,
+    fs.stop_order as from_order, fs.departure_time as from_dep_time,
+    ts.stop_order as to_order, ts.arrival_time as to_arr_time,
+    tse.id as seat_id, tse.seat_type_id, tse.from_stop_order, tse.to_stop_order,
+    tse.total_seats, tse.available_seats, tse.price,
+    st.name as seat_type_name, st.code as seat_type_code
+  FROM train_stops fs
+  JOIN train_stops ts ON fs.train_id = ts.train_id AND ts.stop_order > fs.stop_order
+  JOIN trains t ON t.id = fs.train_id AND t.status = 'active'
+  JOIN train_seats tse ON tse.train_id = t.id
+    AND tse.from_stop_order <= fs.stop_order AND tse.to_stop_order >= ts.stop_order
+  JOIN seat_types st ON st.id = tse.seat_type_id
+  WHERE fs.station_id = ? AND ts.station_id = ?
+  ORDER BY t.id, st.id, tse.from_stop_order
+`;
+
 router.get("/search", (req: Request, res: Response) => {
   const { from_station_id, to_station_id } = req.query;
   if (!from_station_id || !to_station_id) {
@@ -11,47 +56,59 @@ router.get("/search", (req: Request, res: Response) => {
   }
   const db = getDb();
 
-  const fromStops = db.prepare(
-    "SELECT train_id, stop_order as from_order, departure_time as from_dep_time FROM train_stops WHERE station_id = ?"
-  ).all(from_station_id) as { train_id: number; from_order: number; from_dep_time: string }[];
+  const rows = db.prepare(SEARCH_SQL).all(from_station_id, to_station_id) as SearchRow[];
 
-  const results = [];
-  for (const fromStop of fromStops) {
-    const toStop = db.prepare(
-      "SELECT stop_order as to_order, arrival_time as to_arr_time FROM train_stops WHERE train_id = ? AND station_id = ? AND stop_order > ?"
-    ).get(fromStop.train_id, to_station_id, fromStop.from_order) as { to_order: number; to_arr_time: string } | undefined;
+  const trainMap = new Map<number, {
+    train: Record<string, unknown>;
+    from_stop: Record<string, unknown>;
+    to_stop: Record<string, unknown>;
+    seats: Record<string, unknown>[];
+    from_station: unknown;
+    to_station: unknown;
+  }>();
 
-    if (!toStop) continue;
-
-    const train = db.prepare("SELECT * FROM trains WHERE id = ? AND status = 'active'").get(fromStop.train_id);
-    if (!train) continue;
-
-    const seats = db.prepare(`
-      SELECT ts.*, st.name as seat_type_name, st.code as seat_type_code
-      FROM train_seats ts
-      JOIN seat_types st ON ts.seat_type_id = st.id
-      WHERE ts.train_id = ? AND ts.from_stop_order <= ? AND ts.to_stop_order >= ?
-      ORDER BY st.id
-    `).all(fromStop.train_id, fromStop.from_order, toStop.to_order) as Record<string, unknown>[];
-
-    const fromStation = db.prepare("SELECT * FROM stations WHERE id = ?").get(from_station_id);
-    const toStation = db.prepare("SELECT * FROM stations WHERE id = ?").get(to_station_id);
-
-    const minSeatsByType = new Map<number, { seats: Record<string, unknown>; minAvail: number }>();
-    for (const seat of seats) {
-      const typeId = seat.seat_type_id as number;
-      const avail = seat.available_seats as number;
-      if (!minSeatsByType.has(typeId) || avail < minSeatsByType.get(typeId)!.minAvail) {
-        minSeatsByType.set(typeId, { seats: seat, minAvail: avail });
-      }
+  for (const row of rows) {
+    if (!trainMap.has(row.train_id)) {
+      trainMap.set(row.train_id, {
+        train: {
+          id: row.train_id, train_number: row.train_number, train_type: row.train_type,
+          departure_station_id: row.departure_station_id, arrival_station_id: row.arrival_station_id,
+          departure_time: row.departure_time, arrival_time: row.arrival_time,
+          duration: row.duration, status: row.status, created_at: row.created_at,
+        },
+        from_stop: { train_id: row.train_id, from_order: row.from_order, from_dep_time: row.from_dep_time },
+        to_stop: { to_order: row.to_order, to_arr_time: row.to_arr_time },
+        seats: [],
+        from_station: null,
+        to_station: null,
+      });
     }
 
-    const uniqueSeats = Array.from(minSeatsByType.values()).map((v) => v.seats);
-
-    results.push({ train, from_stop: fromStop, to_stop: toStop, seats: uniqueSeats, from_station: fromStation, to_station: toStation });
+    const entry = trainMap.get(row.train_id)!;
+    const existingSeat = entry.seats.find((s) => s.seat_type_id === row.seat_type_id);
+    if (!existingSeat) {
+      entry.seats.push({
+        id: row.seat_id, seat_type_id: row.seat_type_id,
+        from_stop_order: row.from_stop_order, to_stop_order: row.to_stop_order,
+        total_seats: row.total_seats, available_seats: row.available_seats,
+        price: row.price, seat_type_name: row.seat_type_name, seat_type_code: row.seat_type_code,
+      });
+    } else if (row.available_seats < (existingSeat.available_seats as number)) {
+      existingSeat.available_seats = row.available_seats;
+      existingSeat.price = row.price;
+    }
   }
 
-  results.sort((a, b) => (a.from_stop as { from_dep_time: string }).from_dep_time.localeCompare((b.from_stop as { from_dep_time: string }).from_dep_time));
+  const fromStation = db.prepare("SELECT * FROM stations WHERE id = ?").get(from_station_id);
+  const toStation = db.prepare("SELECT * FROM stations WHERE id = ?").get(to_station_id);
+
+  const results = Array.from(trainMap.values());
+  for (const r of results) {
+    r.from_station = fromStation;
+    r.to_station = toStation;
+  }
+
+  results.sort((a, b) => (a.from_stop.from_dep_time as string).localeCompare(b.from_stop.from_dep_time as string));
   res.json(results);
 });
 

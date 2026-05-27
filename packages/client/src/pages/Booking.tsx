@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Train, CreditCard, User, CheckCircle } from "lucide-react";
 import api from "@/services/api";
 import { useAuthStore } from "@/store/authStore";
-import { formatPrice } from "@/lib/utils";
+import { formatPrice, validateIdCard, validatePhone } from "@/lib/utils";
 import type { Contact } from "@/types";
 
 type Step = "passenger" | "confirm" | "payment" | "done";
@@ -192,7 +192,13 @@ export default function BookingPage() {
             <Button
               className="w-full bg-railway-orange hover:bg-orange-600"
               disabled={!passengerName || !passengerIdCard}
-              onClick={() => setStep("confirm")}
+              onClick={() => {
+                const idErr = validateIdCard(passengerIdCard);
+                if (idErr) { alert(idErr); return; }
+                const phoneErr = validatePhone(passengerPhone);
+                if (phoneErr) { alert(phoneErr); return; }
+                setStep("confirm");
+              }}
             >
               下一步：确认订单
             </Button>

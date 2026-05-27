@@ -204,6 +204,26 @@ router.post("/orders/:id/refund", (req: Request, res: Response) => {
   }
   db.prepare("UPDATE bookings SET status = 'refunded', updated_at = CURRENT_TIMESTAMP WHERE id = ?").run(booking.id);
   db.prepare("UPDATE payments SET payment_status = 'refunded' WHERE booking_id = ?").run(booking.id);
+
+  const fromStop = db.prepare(`
+    SELECT ts.stop_order FROM bookings b
+    JOIN train_stops ts ON ts.train_id = b.train_id AND ts.station_id = b.from_station_id
+    WHERE b.id = ?
+  `).get(booking.id) as { stop_order: number } | undefined;
+  const toStop = db.prepare(`
+    SELECT ts.stop_order FROM bookings b
+    JOIN train_stops ts ON ts.train_id = b.train_id AND ts.station_id = b.to_station_id
+    WHERE b.id = ?
+  `).get(booking.id) as { stop_order: number } | undefined;
+  if (fromStop && toStop) {
+    db.prepare(`
+      UPDATE train_seats SET available_seats = available_seats + 1
+      WHERE train_id = (SELECT train_id FROM bookings WHERE id = ?)
+      AND seat_type_id = (SELECT seat_type_id FROM bookings WHERE id = ?)
+      AND from_stop_order <= ? AND to_stop_order >= ?
+    `).run(booking.id, booking.id, fromStop.stop_order, toStop.stop_order);
+  }
+
   res.json({ message: "退票成功" });
 });
 

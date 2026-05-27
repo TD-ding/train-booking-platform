@@ -31,7 +31,7 @@ export function seedData(): void {
     ["西安北", "XAB", "西安", "xianbei"],
     ["南京南", "NJN", "南京", "nanjingnan"],
     ["杭州东", "HZD", "杭州", "hangzhoudong"],
-    ["长沙南", "CSN", "长沙", "changshan"],
+    ["长沙南", "CSN", "长沙", "changshanan"],
     ["重庆北", "CQB", "重庆", "chongqingbei"],
     ["郑州东", "ZZD", "郑州", "zhengzhoudong"],
     ["天津南", "TJN", "天津", "tianjinnan"],
@@ -40,6 +40,11 @@ export function seedData(): void {
     ["昆明南", "KMN", "昆明", "kunnanning"],
     ["贵阳北", "GYB", "贵阳", "guiyangbei"],
     ["南昌西", "NCX", "南昌", "nanchangxi"],
+    ["徐州东", "XZD", "徐州", "xuzhoudong"],
+    ["洛阳龙门", "LYLM", "洛阳", "luoyanglongmen"],
+    ["宁波", "NB", "宁波", "ningbo"],
+    ["福州南", "FZN", "福州", "fuzhounan"],
+    ["厦门北", "XMB", "厦门", "xiaenbei"],
   ];
 
   const stationIds: Record<string, number> = {};
@@ -127,7 +132,7 @@ export function seedData(): void {
       stops: [
         { station: "北京南", arr: "", dep: "07:45", order: 1 },
         { station: "济南西", arr: "09:25", dep: "09:28", order: 2 },
-        { station: "徐州东", arr: "", dep: "", order: 3 },
+        { station: "徐州东", arr: "10:15", dep: "10:18", order: 3 },
         { station: "南京南", arr: "11:30", dep: "", order: 4 },
       ],
       prices: { "商务座": 1248, "软卧": 0, "硬卧": 0, "软座": 0, "硬座": 443 },
@@ -146,7 +151,7 @@ export function seedData(): void {
       depTime: "08:30", arrTime: "11:08", duration: "2小时38分",
       stops: [
         { station: "郑州东", arr: "", dep: "08:30", order: 1 },
-        { station: "洛阳龙门", arr: "", dep: "", order: 2 },
+        { station: "洛阳龙门", arr: "09:20", dep: "09:23", order: 2 },
         { station: "西安北", arr: "11:08", dep: "", order: 3 },
       ],
       prices: { "商务座": 978, "软卧": 0, "硬卧": 0, "软座": 0, "硬座": 269 },
@@ -157,9 +162,9 @@ export function seedData(): void {
       stops: [
         { station: "上海虹桥", arr: "", dep: "06:50", order: 1 },
         { station: "杭州东", arr: "07:50", dep: "07:53", order: 2 },
-        { station: "宁波", arr: "", dep: "", order: 3 },
-        { station: "福州南", arr: "", dep: "", order: 4 },
-        { station: "厦门北", arr: "", dep: "", order: 5 },
+        { station: "宁波", arr: "09:05", dep: "09:10", order: 3 },
+        { station: "福州南", arr: "11:20", dep: "11:25", order: 4 },
+        { station: "厦门北", arr: "13:10", dep: "13:15", order: 5 },
         { station: "深圳北", arr: "15:30", dep: "", order: 6 },
       ],
       prices: { "商务座": 0, "软卧": 856, "硬卧": 564, "软座": 0, "硬座": 354 },
@@ -214,9 +219,11 @@ export function seedData(): void {
     );
 
     for (const s of t.stops) {
-      if (s.station in stationIds) {
-        insertStop.run(trainId, stationIds[s.station], s.order, s.arr, s.dep, 2);
+      if (!(s.station in stationIds)) {
+        console.warn(`Warning: station "${s.station}" referenced by train ${t.number} not found, skipping stop`);
+        continue;
       }
+      insertStop.run(trainId, stationIds[s.station], s.order, s.arr, s.dep, 2);
     }
 
     const maxOrder = Math.max(...t.stops.map((s) => s.order));

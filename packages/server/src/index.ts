@@ -10,6 +10,7 @@ import trainRoutes from "./routes/trains.js";
 import bookingRoutes from "./routes/bookings.js";
 import contactRoutes from "./routes/contacts.js";
 import adminRoutes from "./routes/admin.js";
+import { errorHandler } from "./middleware/errorHandler.js";
 
 const app = express();
 
@@ -30,6 +31,8 @@ app.use("/api/admin", adminRoutes);
 app.get("/api/health", (_req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });
 });
+
+app.use(errorHandler);
 
 app.listen(config.port, () => {
   console.log(`🚄 火车票订购平台后端服务运行在 http://localhost:${config.port}`);
